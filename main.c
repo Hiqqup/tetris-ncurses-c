@@ -27,8 +27,8 @@ int gameRunning = 1;
 
 int currentOffsets[4][2];
 short currentColor;
-int anchorX;
 int anchorY;
+int anchorX;
 
 // offsets
 const int PIECE_OFFSETS[7][4][2] = {
@@ -112,8 +112,8 @@ void printPix(int x, int y, short color)
 void setCurrent()
 {
     int index = rand() % 7;
-    anchorY = BOARD_LENGTH / 2;
-    anchorX = -1;
+    anchorX = BOARD_LENGTH / 2;
+    anchorY = -1;
     for (int i = 0; i < 4; i++) {
         currentOffsets[i][0] = PIECE_OFFSETS[index][i][0];
         currentOffsets[i][1] = PIECE_OFFSETS[index][i][1];
@@ -123,20 +123,36 @@ void setCurrent()
 void printCurrent()
 {
     for (int i = 0; i < 4; i++) {
-        printPix(anchorX + currentOffsets[i][0], anchorY + currentOffsets[i][1], currentColor);
+        printPix(anchorY + currentOffsets[i][0], anchorX + currentOffsets[i][1], currentColor);
     }
 }
 void unprintCurrent()
 {
     for (int i = 0; i < 4; i++) {
-        printPix(anchorX + currentOffsets[i][0], anchorY + currentOffsets[i][1], GROUP_BLACK);
+        printPix(anchorY + currentOffsets[i][0], anchorX + currentOffsets[i][1], GROUP_BLACK);
     }
+}
+int checkColision()
+{
+    for (int i = 0; i < 4; i++) {
+        int x = anchorY + currentOffsets[i][0];
+        int y = anchorX + currentOffsets[i][1];
+        if (y < 0 || x > BOARD_HEIGHT - 1 || y > BOARD_LENGTH) {
+            return 1;
+        }
+    }
+    return 0;
 }
 void* gameTick(void* args)
 {
     while (gameRunning) {
         unprintCurrent();
-        anchorX++;
+        anchorY++;
+        if (checkColision()) {
+            anchorY--;
+            printCurrent();
+            setCurrent();
+        }
         printCurrent();
         refresh();
         usleep(tickSpeed);
@@ -163,31 +179,56 @@ void printBoard()
     }
     refresh();
 }
+void rotate(int direction)
+{
+    for (int i = 0; i < 4; i++) {
+        int buf = currentOffsets[i][1];
+        currentOffsets[i][1] = -currentOffsets[i][0] * direction;
+        currentOffsets[i][0] = buf * direction;
+    }
+}
 
 void handleInput()
 {
     while (gameRunning) {
         ch = getch();
+        unprintCurrent();
         switch (ch) {
-        case 97: /* a*/
 
+        case 97: /* a*/
+            anchorX--;
+            if (checkColision())
+                anchorX++;
             break;
         case 100: /* d*/
-
+            anchorX++;
+            if (checkColision())
+                anchorX--;
             break;
         case 115: /* s*/
-
-            break;
-        case 119: /* w*/
-
+            anchorY++;
+            if (checkColision()) {
+                anchorY--;
+                printCurrent();
+                setCurrent();
+            }
             break;
         case 106: /* j*/
-
+            rotate(1);
+            if (checkColision())
+                rotate(-1);
             break;
         case 107: /* k*/
+            rotate(-1);
+            if (checkColision())
+                rotate(1);
 
             break;
+        case 32: /* space */
+            // quickdrop
+            break;
         }
+        printCurrent();
     }
 }
 int main()
