@@ -30,6 +30,10 @@ short currentColor;
 int anchorY;
 int anchorX;
 
+int checked[4];
+
+short frozenPieces[BOARD_LENGTH][BOARD_HEIGHT];
+
 // offsets
 const int PIECE_OFFSETS[7][4][2] = {
     // l piece
@@ -100,7 +104,7 @@ void ncursesSetup()
     init_pair(7, COLOR_BLACK, COLOR_MAGENTA);
     init_pair(8, COLOR_BLACK, COLOR_RED);
     init_pair(9, COLOR_BLACK, COLOR_YELLOW);
-    init_pair(9, COLOR_WHITE, COLOR_BLACK);
+    init_pair(10, COLOR_WHITE, COLOR_BLACK);
     // timeout(tickSpeed / 1000);
 }
 void printPix(int x, int y, short color)
@@ -113,7 +117,7 @@ void setCurrent()
 {
     int index = rand() % 7;
     anchorX = BOARD_LENGTH / 2;
-    anchorY = -1;
+    anchorY = 0;
     for (int i = 0; i < 4; i++) {
         currentOffsets[i][0] = PIECE_OFFSETS[index][i][0];
         currentOffsets[i][1] = PIECE_OFFSETS[index][i][1];
@@ -132,43 +136,15 @@ void unprintCurrent()
         printPix(anchorY + currentOffsets[i][0], anchorX + currentOffsets[i][1], GROUP_BLACK);
     }
 }
-int checkColision()
-{
-    for (int i = 0; i < 4; i++) {
-        int x = anchorY + currentOffsets[i][0];
-        int y = anchorX + currentOffsets[i][1];
-        if (y < 0 || x > BOARD_HEIGHT - 1 || y > BOARD_LENGTH) {
-            return 1;
-        }
-    }
-    return 0;
-}
-void* gameTick(void* args)
-{
-    while (gameRunning) {
-        unprintCurrent();
-        anchorY++;
-        if (checkColision()) {
-            anchorY--;
-            printCurrent();
-            setCurrent();
-        }
-        printCurrent();
-        refresh();
-        usleep(tickSpeed);
-    }
-    return NULL;
-}
-
 void printBoard()
 {
     for (int i = -2; i < BOARD_HEIGHT; i++) {
         printPix(i, -1, GROUP_WHITE);
     }
     for (int i = -2; i < BOARD_HEIGHT; i++) {
-        printPix(i, BOARD_LENGTH + 1, GROUP_WHITE);
+        printPix(i, BOARD_LENGTH, GROUP_WHITE);
     }
-    for (int i = -1; i < BOARD_LENGTH + 2; i++) {
+    for (int i = -1; i < BOARD_LENGTH + 1; i++) {
         printPix(BOARD_HEIGHT, i, GROUP_WHITE);
     }
     for (int i = 0; i < offsetX * 2 - 2; i++) {
@@ -179,6 +155,94 @@ void printBoard()
     }
     refresh();
 }
+int checkColision()
+{
+    for (int i = 0; i < 4; i++) {
+        int y = anchorY + currentOffsets[i][0];
+        int x = anchorX + currentOffsets[i][1];
+        if (x < 0 || y > BOARD_HEIGHT - 1 || x >= BOARD_LENGTH || frozenPieces[x][y] != 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+int checkCompletedRow(int y)
+{
+    for (int x = 0; x < BOARD_LENGTH; x++) {
+        // mvprintw(y, x, "%i", frozenPieces[x][y]);
+        if (frozenPieces[x][y] == 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+void clearRow(int startY)
+{
+    for (int y = startY; y > 0; y--) {
+        for (int x = 0; x < BOARD_LENGTH; x++) {
+            frozenPieces[x][y] = frozenPieces[x][y - 1];
+        }
+    }
+}
+void reprintFrozenPieces()
+{
+    clear();
+    printBoard();
+
+    for (int x = 0; x < BOARD_LENGTH; x++) {
+        for (int y = 0; y < BOARD_HEIGHT; y++) {
+            if (frozenPieces[x][y])
+                printPix(y, x, frozenPieces[x][y]);
+        }
+    }
+
+    refresh();
+}
+/*
+void debugFrozenPieces()
+{
+    for (int x = 0; x < BOARD_LENGTH; x++) {
+        for (int y = 0; y < BOARD_HEIGHT; y++) {
+            mvprintw(y, x * 2, "%i", frozenPieces[x][y]);
+        }
+    }
+}
+*/
+void freezePiece()
+{
+    anchorY--;
+    printCurrent();
+    for (int i = 0; i < 4; i++) {
+        int y = anchorY + currentOffsets[i][0];
+        int x = anchorX + currentOffsets[i][1];
+        frozenPieces[x][y] = currentColor;
+        checked[i] = y;
+    }
+    for (int i = 0; i < 4; i++) {
+        if (checkCompletedRow(checked[i])) {
+            clearRow(checked[i]);
+            reprintFrozenPieces();
+        }
+    }
+    setCurrent();
+}
+
+void* gameTick(void* args)
+{
+    while (gameRunning) {
+        unprintCurrent();
+        anchorY++;
+        if (checkColision()) {
+            freezePiece();
+        }
+        printCurrent();
+        // debugFrozenPieces();
+        refresh();
+        usleep(tickSpeed);
+    }
+    return NULL;
+}
+
 void rotate(int direction)
 {
     for (int i = 0; i < 4; i++) {
@@ -208,9 +272,7 @@ void handleInput()
         case 115: /* s*/
             anchorY++;
             if (checkColision()) {
-                anchorY--;
-                printCurrent();
-                setCurrent();
+                freezePiece();
             }
             break;
         case 106: /* j*/
