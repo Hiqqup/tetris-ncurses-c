@@ -8,15 +8,8 @@
 #define BOARD_LENGTH 10
 #define BOARD_HEIGHT 20
 
-#define GROUP_GAMEOVERLINE 10
 #define GROUP_WHITE 1
 #define GROUP_BLACK 2
-#define GROUP_YELLOW 3
-#define GROUP_GREEN 4
-#define GROUP_BLUE 5
-#define GROUP_CYAN 6
-#define GROUP_MAGENTA 7
-#define GROUP_RED 8
 
 int offsetX = 5;
 int offsetY = 2;
